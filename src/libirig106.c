@@ -12,6 +12,27 @@
 #include "i106_util.h"
 
 
+// wrapper around read to read exactly the amount of bytes
+static ssize_t readall(int fd, char *buf, size_t count)
+{
+	ssize_t total = 0;
+
+	do {
+		ssize_t res = read(fd, buf + total, count - total);
+		switch (res) {
+			case 0:
+				return total;
+			case -1:
+				return -1;
+			default:
+				total += res;
+				break;
+		}
+	} while (total < count);
+
+	return total;
+}
+
 // Simple header validation. Returns 1 = valid, 0 = invalid
 int ValidHeader(I106C10Header *header){
     if (header->SyncPattern != IRIG106_SYNC)
@@ -41,7 +62,7 @@ I106Status I106NextHeader(int fd, I106C10Header *header){
         offset = lseek(fd, 0, SEEK_CUR);
 
         // Read the header and secondary header if present
-        read_count = read(fd, header, HEADER_SIZE);
+        read_count = readall(fd, header, HEADER_SIZE);
         if (read_count != HEADER_SIZE){
             if (read_count == -1)
                 return I106_READ_ERROR;
@@ -49,7 +70,7 @@ I106Status I106NextHeader(int fd, I106C10Header *header){
         }
 
         if (header->PacketFlags & I106CH10_PFLAGS_SEC_HEADER){
-            read_count = read(fd, &header->Time[0], SEC_HEADER_SIZE);
+            read_count = readall(fd, &header->Time[0], SEC_HEADER_SIZE);
             if (read_count != SEC_HEADER_SIZE){
                 if (read_count == -1)
                     return I106_READ_ERROR;
@@ -364,7 +385,7 @@ I106Status I106C10ReadNextHeader(int handle, I106C10Header *header){
 
         // Read the header
         if (handles[handle].FileMode != READ_NET_STREAM)
-            read_count = read(handles[handle].File, header, HEADER_SIZE);
+            read_count = readall(handles[handle].File, header, HEADER_SIZE);
 
         // Keep track of how much header we've read
         handles[handle].HeaderBufferLength = HEADER_SIZE;
@@ -401,7 +422,7 @@ I106Status I106C10ReadNextHeader(int handle, I106C10Header *header){
         else if (header->PacketFlags & I106CH10_PFLAGS_SEC_HEADER){
             // Read the secondary header
             if (handles[handle].FileMode != READ_NET_STREAM)
-                read_count = read(handles[handle].File, &header->Time[0], SEC_HEADER_SIZE);
+                read_count = readall(handles[handle].File, &header->Time[0], SEC_HEADER_SIZE);
 
             // Keep track of how much header we've read
             handles[handle].HeaderBufferLength += SEC_HEADER_SIZE;
@@ -583,7 +604,7 @@ I106Status I106C10ReadData(int handle, unsigned long buffer_size, void *buffer){
 
     // Read the data, filler, and data checksum
     if (handles[handle].FileMode != READ_NET_STREAM)
-        read_count = read(handles[handle].File, buffer, read_amount);
+        read_count = readall(handles[handle].File, buffer, read_amount);
 
     // If there was an error reading, figure out why
     if ((unsigned long)read_count != read_amount){

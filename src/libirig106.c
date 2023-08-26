@@ -13,7 +13,7 @@
 
 
 // wrapper around read to read exactly the amount of bytes
-static ssize_t readall(int fd, char *buf, size_t count)
+static ssize_t readall(int fd, void *buf, size_t count)
 {
 	ssize_t total = 0;
 
